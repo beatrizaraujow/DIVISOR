@@ -132,7 +132,7 @@ function loginView() {
   return `
     <main class="login-page">
       <div class="lp-left">
-        <img src="/logo.png" alt="logo" class="lp-logo" />
+        <img src="/logo/logo.png" alt="logo" class="lp-logo" />
       </div>
       <div class="lp-right">
         <div class="lp-watermark">45</div>
