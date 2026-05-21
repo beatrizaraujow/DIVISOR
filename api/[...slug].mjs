@@ -2,13 +2,53 @@ import bcrypt from 'bcryptjs';
 import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } from './lib/auth.mjs';
 import { readStateWithMeta, updateState, resetToSeed } from './lib/store.mjs';
 
-export const config = {
-  path: '/api/*',
-};
+// ─── Vercel Node.js entry point ───────────────────────────────────────────────
 
-export default async function handler(req, context) {
+export default async function handler(req, res) {
   try {
-    const stateMeta = await readStateWithMeta(context);
+    const webReq = await toWebRequest(req);
+    const webRes = await dispatch(webReq);
+    await writeWebResponse(res, webRes);
+  } catch (error) {
+    res.writeHead(error.statusCode || 500, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: error.message || 'Erro interno do servidor.' }));
+  }
+}
+
+async function toWebRequest(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const rawBody = Buffer.concat(chunks);
+
+  const protocol = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+  const fullUrl = `${protocol}://${host}${req.url}`;
+
+  const headers = new Headers();
+  for (const [key, val] of Object.entries(req.headers)) {
+    if (val !== undefined) {
+      Array.isArray(val) ? val.forEach(v => headers.append(key, v)) : headers.set(key, val);
+    }
+  }
+
+  return new Request(fullUrl, {
+    method: req.method,
+    headers,
+    body: ['GET', 'HEAD'].includes(req.method.toUpperCase()) ? null : rawBody,
+  });
+}
+
+async function writeWebResponse(res, webRes) {
+  res.statusCode = webRes.status;
+  for (const [key, val] of webRes.headers.entries()) res.setHeader(key, val);
+  res.end(Buffer.from(await webRes.arrayBuffer()));
+}
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+async function dispatch(req) {
+  try {
+    const stateMeta = await readStateWithMeta();
     const url = new URL(req.url);
     const route = normalizePath(url.pathname);
     const method = req.method.toUpperCase();
@@ -20,34 +60,34 @@ export default async function handler(req, context) {
       return await handleLogin(req, stateMeta.state);
     }
     if (method === 'POST' && route === '/logout') {
-      return await requireAuth(req, stateMeta.state, () => handleLogout());
+      return requireAuth(req, stateMeta.state, () => handleLogout());
     }
     if (method === 'GET' && route === '/dashboard') {
-      return await requireAuth(req, stateMeta.state, user => handleDashboard(stateMeta.state, user));
+      return requireAuth(req, stateMeta.state, user => handleDashboard(stateMeta.state, user));
     }
     if (method === 'POST' && route === '/timer/start') {
-      return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user, context));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user));
     }
     if (method === 'POST' && route === '/timer/stop') {
-      return await requireAuth(req, stateMeta.state, user => handleTimerStop(user, context));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStop(user));
     }
     if (method === 'GET' && route === '/reports') {
-      return await requireAuth(req, stateMeta.state, user => handleReports(req, stateMeta.state, user));
+      return requireAuth(req, stateMeta.state, user => handleReports(req, stateMeta.state, user));
     }
     if (method === 'GET' && route === '/reports/export') {
-      return await requireAuth(req, stateMeta.state, user => handleReportExport(req, stateMeta.state, user));
+      return requireAuth(req, stateMeta.state, user => handleReportExport(req, stateMeta.state, user));
     }
     if (method === 'DELETE' && route.startsWith('/entries/')) {
-      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user, context));
+      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user));
     }
     if (method === 'POST' && route === '/password') {
-      return await handleChangePassword(req, stateMeta.state, context);
+      return await handleChangePassword(req, stateMeta.state);
     }
     if (method === 'POST' && route === '/reset') {
-      return await requireAuth(req, stateMeta.state, user => handleReset(user, context));
+      return await requireAuth(req, stateMeta.state, user => handleReset(user));
     }
     if (method === 'GET' && route === '/admin/reset') {
-      return await handlePublicReset(req, context);
+      return await handlePublicReset(req);
     }
 
     return json(404, { error: 'Rota nao encontrada.' });
@@ -57,15 +97,14 @@ export default async function handler(req, context) {
 }
 
 function normalizePath(pathname = '') {
-  const prefixes = ['/.netlify/functions/api', '/api'];
-  for (const prefix of prefixes) {
-    if (pathname.startsWith(prefix)) {
-      const rest = pathname.slice(prefix.length);
-      return rest || '/';
-    }
+  if (pathname.startsWith('/api')) {
+    const rest = pathname.slice('/api'.length);
+    return rest || '/';
   }
   return pathname || '/';
 }
+
+// ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
 function json(statusCode, payload, extraHeaders = {}) {
   return new Response(JSON.stringify(payload), {
@@ -92,50 +131,47 @@ async function parseJsonBody(req) {
   }
 }
 
+// ─── Domain helpers ───────────────────────────────────────────────────────────
+
 function publicUser(user) {
   if (!user) return null;
-  return {
-    id: user.id,
-    name: user.name,
-    login: user.login,
-    role: user.role,
-  };
+  return { id: user.id, name: user.name, login: user.login, role: user.role };
 }
 
 function listUsers(state) {
   return state.users
     .slice()
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map(publicUser);
 }
 
 function listCompanies(state) {
   return state.companies
     .slice()
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map(company => ({ id: company.id, name: company.name, slug: company.slug }));
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => ({ id: c.id, name: c.name, slug: c.slug }));
 }
 
 function findUserById(state, userId) {
-  return state.users.find(user => user.id === Number(userId)) || null;
+  return state.users.find(u => u.id === Number(userId)) || null;
 }
 
 function findUserByLogin(state, login) {
-  return state.users.find(user => user.login === login) || null;
+  return state.users.find(u => u.login === login) || null;
 }
 
 function findCompanyById(state, companyId) {
-  return state.companies.find(company => company.id === Number(companyId)) || null;
+  return state.companies.find(c => c.id === Number(companyId)) || null;
 }
 
 function requireAuth(req, state, callback) {
   const userId = getUserIdFromRequest(req);
   const user = userId ? findUserById(state, userId) : null;
-  if (!user) {
-    return json(401, { error: 'Nao autenticado.' });
-  }
+  if (!user) return json(401, { error: 'Nao autenticado.' });
   return callback(publicUser(user));
 }
+
+// ─── Route handlers ───────────────────────────────────────────────────────────
 
 function handleSession(req, state) {
   const userId = getUserIdFromRequest(req);
@@ -160,11 +196,7 @@ async function handleLogin(req, state) {
 
   return json(
     200,
-    {
-      user: publicUser(user),
-      companies: listCompanies(state),
-      users: listUsers(state),
-    },
+    { user: publicUser(user), companies: listCompanies(state), users: listUsers(state) },
     { 'Set-Cookie': buildSessionCookie(user.id) }
   );
 }
@@ -172,6 +204,8 @@ async function handleLogin(req, state) {
 function handleLogout() {
   return json(200, { ok: true }, { 'Set-Cookie': buildExpiredSessionCookie() });
 }
+
+// ─── Time helpers ─────────────────────────────────────────────────────────────
 
 function startOfWeek(date) {
   const base = new Date(date);
@@ -207,11 +241,7 @@ function toIso(date) {
 function parseDateRange(query) {
   const from = query.from ? new Date(query.from) : null;
   const to = query.to ? new Date(query.to) : null;
-
-  if (to) {
-    to.setUTCDate(to.getUTCDate() + 1);
-  }
-
+  if (to) to.setUTCDate(to.getUTCDate() + 1);
   return {
     from: from ? from.toISOString() : null,
     to: to ? to.toISOString() : null,
@@ -249,16 +279,15 @@ function listEntries(state, filters = {}, referenceNow = new Date()) {
       return true;
     })
     .slice()
-    .sort((left, right) => new Date(right.startAt) - new Date(left.startAt))
+    .sort((a, b) => new Date(b.startAt) - new Date(a.startAt))
     .map(entry => mapEntry(state, entry, referenceNow));
 }
 
 function getActiveEntryForUser(state, userId, referenceNow = new Date()) {
   const entry = state.entries
-    .filter(item => item.userId === Number(userId) && !item.endAt)
+    .filter(e => e.userId === Number(userId) && !e.endAt)
     .slice()
-    .sort((left, right) => new Date(right.startAt) - new Date(left.startAt))[0];
-
+    .sort((a, b) => new Date(b.startAt) - new Date(a.startAt))[0];
   return entry ? mapEntry(state, entry, referenceNow) : null;
 }
 
@@ -274,7 +303,7 @@ function summarizeEntries(entries) {
   });
 
   return {
-    totalMinutes: entries.reduce((sum, entry) => sum + entry.minutes, 0),
+    totalMinutes: entries.reduce((sum, e) => sum + e.minutes, 0),
     entriesCount: entries.length,
     byUser: mapTotals(totalsByUser),
     byCompany: mapTotals(totalsByCompany),
@@ -285,7 +314,7 @@ function summarizeEntries(entries) {
 function mapTotals(map) {
   return [...map.entries()]
     .map(([label, minutes]) => ({ label, minutes }))
-    .sort((left, right) => right.minutes - left.minutes || String(left.label).localeCompare(String(right.label)));
+    .sort((a, b) => b.minutes - a.minutes || String(a.label).localeCompare(String(b.label)));
 }
 
 function buildDashboard(state, currentUser) {
@@ -297,35 +326,35 @@ function buildDashboard(state, currentUser) {
 
   const weekEntries = listEntries(state, { from: weekFrom, to: weekTo }, now);
   const monthEntries = listEntries(state, { from: monthFrom, to: monthTo }, now);
-  const userWeekEntries = weekEntries.filter(entry => entry.userId === currentUser.id);
-  const userMonthEntries = monthEntries.filter(entry => entry.userId === currentUser.id);
+  const userWeekEntries = weekEntries.filter(e => e.userId === currentUser.id);
+  const userMonthEntries = monthEntries.filter(e => e.userId === currentUser.id);
 
   return {
     user: currentUser,
     activeEntry: getActiveEntryForUser(state, currentUser.id, now),
-    userWeekMinutes: userWeekEntries.reduce((sum, entry) => sum + entry.minutes, 0),
-    userMonthMinutes: userMonthEntries.reduce((sum, entry) => sum + entry.minutes, 0),
+    userWeekMinutes: userWeekEntries.reduce((sum, e) => sum + e.minutes, 0),
+    userMonthMinutes: userMonthEntries.reduce((sum, e) => sum + e.minutes, 0),
     recentEntries: listEntries(state, { userId: currentUser.id }, now).slice(0, 10),
     totals: {
-      teamWeekMinutes: weekEntries.reduce((sum, entry) => sum + entry.minutes, 0),
-      teamMonthMinutes: monthEntries.reduce((sum, entry) => sum + entry.minutes, 0),
+      teamWeekMinutes: weekEntries.reduce((sum, e) => sum + e.minutes, 0),
+      teamMonthMinutes: monthEntries.reduce((sum, e) => sum + e.minutes, 0),
     },
     ranking: listUsers(state)
       .map(user => ({
         id: user.id,
         name: user.name,
         role: user.role,
-        weekMinutes: weekEntries.filter(entry => entry.userId === user.id).reduce((sum, entry) => sum + entry.minutes, 0),
-        monthMinutes: monthEntries.filter(entry => entry.userId === user.id).reduce((sum, entry) => sum + entry.minutes, 0),
+        weekMinutes: weekEntries.filter(e => e.userId === user.id).reduce((sum, e) => sum + e.minutes, 0),
+        monthMinutes: monthEntries.filter(e => e.userId === user.id).reduce((sum, e) => sum + e.minutes, 0),
         activeEntry: getActiveEntryForUser(state, user.id, now),
       }))
-      .sort((left, right) => right.weekMinutes - left.weekMinutes || right.monthMinutes - left.monthMinutes),
+      .sort((a, b) => b.weekMinutes - a.weekMinutes || b.monthMinutes - a.monthMinutes),
     companyStats: listCompanies(state).map(company => ({
       id: company.id,
       name: company.name,
       slug: company.slug,
-      weekMinutes: weekEntries.filter(entry => entry.companyId === company.id).reduce((sum, entry) => sum + entry.minutes, 0),
-      monthMinutes: monthEntries.filter(entry => entry.companyId === company.id).reduce((sum, entry) => sum + entry.minutes, 0),
+      weekMinutes: weekEntries.filter(e => e.companyId === company.id).reduce((sum, e) => sum + e.minutes, 0),
+      monthMinutes: monthEntries.filter(e => e.companyId === company.id).reduce((sum, e) => sum + e.minutes, 0),
     })),
   };
 }
@@ -334,7 +363,7 @@ function handleDashboard(state, user) {
   return json(200, buildDashboard(state, user));
 }
 
-async function handleTimerStart(req, user, context) {
+async function handleTimerStart(req, user) {
   const body = await parseJsonBody(req);
   const companyId = Number(body.companyId);
 
@@ -345,7 +374,7 @@ async function handleTimerStart(req, user, context) {
       error.statusCode = 400;
       throw error;
     }
-    if (draft.entries.some(entry => entry.userId === user.id && !entry.endAt)) {
+    if (draft.entries.some(e => e.userId === user.id && !e.endAt)) {
       const error = new Error('Ja existe um relogio em andamento para este usuario.');
       error.statusCode = 409;
       throw error;
@@ -359,34 +388,32 @@ async function handleTimerStart(req, user, context) {
       endAt: null,
       createdAt: new Date().toISOString(),
     };
-
     draft.nextIds.entry += 1;
     draft.entries.push(entry);
     return entry.id;
-  }, 4, context);
+  });
 
-  const entry = mapEntry(result.state, result.state.entries.find(item => item.id === result.result));
+  const entry = mapEntry(result.state, result.state.entries.find(e => e.id === result.result));
   return json(201, { entry });
 }
 
-async function handleTimerStop(user, context) {
+async function handleTimerStop(user) {
   const result = await updateState(draft => {
     const activeEntry = draft.entries
-      .filter(entry => entry.userId === user.id && !entry.endAt)
+      .filter(e => e.userId === user.id && !e.endAt)
       .slice()
-      .sort((left, right) => new Date(right.startAt) - new Date(left.startAt))[0];
+      .sort((a, b) => new Date(b.startAt) - new Date(a.startAt))[0];
 
     if (!activeEntry) {
       const error = new Error('Nenhum relogio ativo para encerrar.');
       error.statusCode = 409;
       throw error;
     }
-
     activeEntry.endAt = new Date().toISOString();
     return activeEntry.id;
-  }, 4, context);
+  });
 
-  const entry = mapEntry(result.state, result.state.entries.find(item => item.id === result.result));
+  const entry = mapEntry(result.state, result.state.entries.find(e => e.id === result.result));
   return json(200, { entry });
 }
 
@@ -401,11 +428,7 @@ function handleReports(req, state) {
     companyId: query.companyId ? Number(query.companyId) : null,
   };
   const entries = listEntries(state, filters, new Date());
-  return json(200, {
-    filters,
-    summary: summarizeEntries(entries),
-    entries,
-  });
+  return json(200, { filters, summary: summarizeEntries(entries), entries });
 }
 
 function handleReportExport(req, state) {
@@ -421,41 +444,28 @@ function handleReportExport(req, state) {
   const entries = listEntries(state, filters, new Date());
   const lines = [
     ['id', 'colaborador', 'empresa', 'inicio', 'fim', 'minutos'],
-    ...entries.map(entry => [
-      entry.id,
-      entry.userName,
-      entry.companyName,
-      entry.startAt,
-      entry.endAt || '',
-      entry.minutes,
-    ]),
+    ...entries.map(e => [e.id, e.userName, e.companyName, e.startAt, e.endAt || '', e.minutes]),
   ];
   const csv = lines.map(line => line.map(csvEscape).join(',')).join('\n');
-
   return text(200, csv, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="relatorio-horas.csv"',
   });
 }
 
-async function handleDeleteEntry(route, state, user, context) {
+async function handleDeleteEntry(route, state, user) {
   const entryId = Number(route.split('/').pop());
-  const existing = state.entries.find(entry => entry.id === entryId);
+  const existing = state.entries.find(e => e.id === entryId);
 
-  if (!existing) {
-    return json(404, { error: 'Registro nao encontrado.' });
-  }
+  if (!existing) return json(404, { error: 'Registro nao encontrado.' });
   if (existing.userId !== user.id && user.role !== 'admin') {
     return json(403, { error: 'Sem permissao para excluir este registro.' });
   }
-  if (!existing.endAt) {
-    return json(409, { error: 'Nao e possivel excluir um relogio ativo.' });
-  }
+  if (!existing.endAt) return json(409, { error: 'Nao e possivel excluir um relogio ativo.' });
 
   await updateState(draft => {
-    draft.entries = draft.entries.filter(entry => entry.id !== entryId);
-  }, 4, context);
-
+    draft.entries = draft.entries.filter(e => e.id !== entryId);
+  });
   return json(200, { ok: true });
 }
 
@@ -467,7 +477,7 @@ function csvEscape(value) {
   return textValue;
 }
 
-async function handleChangePassword(req, state, context) {
+async function handleChangePassword(req, state) {
   const { login, currentPassword, newPassword } = await parseJsonBody(req);
   if (!login || !currentPassword || !newPassword) {
     return json(400, { error: 'Dados incompletos.' });
@@ -483,25 +493,25 @@ async function handleChangePassword(req, state, context) {
   await updateState(draft => {
     const u = draft.users.find(item => item.login === login);
     if (u) u.passwordHash = newHash;
-  }, 4, context);
+  });
   return json(200, { ok: true });
 }
 
-async function handleReset(user, context) {
+async function handleReset(user) {
   if (user.role !== 'admin') {
     return json(403, { error: 'Apenas administradores podem resetar o banco de dados.' });
   }
-  await resetToSeed(context);
+  await resetToSeed();
   return json(200, { ok: true, message: 'Banco de dados resetado com os usuarios iniciais.' });
 }
 
-async function handlePublicReset(req, context) {
+async function handlePublicReset(req) {
   const url = new URL(req.url);
   const token = url.searchParams.get('token');
   if (token !== 'mktime-reset-2026') {
     return json(403, { error: 'Token invalido.' });
   }
-  await resetToSeed(context);
+  await resetToSeed();
   return new Response(
     '<!DOCTYPE html><html><body style="font-family:sans-serif;background:#222;color:#FCC100;padding:40px">' +
     '<h2>&#10003; Banco de dados resetado!</h2>' +

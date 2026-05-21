@@ -1,0 +1,103 @@
+{
+  "nextIds": {
+    "user": 9,
+    "company": 4,
+    "entry": 2
+  },
+  "users": [
+    {
+      "id": 1,
+      "name": "Ana Beatriz",
+      "login": "ana",
+      "passwordHash": "$2a$10$LaTCzdLyJ.FaBTdt6A04eOdCWaxOBr56OhTfZinr6smqE8tiSahxG",
+      "role": "admin",
+      "createdAt": "2026-05-21T14:35:46.469Z"
+    },
+    {
+      "id": 2,
+      "name": "Bruno Costa",
+      "login": "bruno",
+      "passwordHash": "$2a$10$VNxacA7q0yI0IOZKgZYZ/eHszE.YCHOwhzwN3pr/50Ps763ME37D2",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.539Z"
+    },
+    {
+      "id": 3,
+      "name": "Carla Souza",
+      "login": "carla",
+      "passwordHash": "$2a$10$ZXBKkDf6pfiqVrucWI4rludTiRsha/GOfMC.R.DAzupdSHciQDZem",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.607Z"
+    },
+    {
+      "id": 4,
+      "name": "Diego Lima",
+      "login": "diego",
+      "passwordHash": "$2a$10$xA63mctLnwkdQuhV8Yl5Bu8BT/4Fypm78ugGUq3yxywSHSOlaYx2e",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.677Z"
+    },
+    {
+      "id": 5,
+      "name": "Elisa Rocha",
+      "login": "elisa",
+      "passwordHash": "$2a$10$E3rOtIbWvbcav41dS.z5SO8vlghNM5SrlZGSLYkYrE99XD0KsNGj.",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.746Z"
+    },
+    {
+      "id": 6,
+      "name": "Felipe Nunes",
+      "login": "felipe",
+      "passwordHash": "$2a$10$rdkq4PmDFwkS9lzIC.ew/uhQRIhVU/ZsPiXnnRny4fg4S8RoLeHdC",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.816Z"
+    },
+    {
+      "id": 7,
+      "name": "Giovana Alves",
+      "login": "giovana",
+      "passwordHash": "$2a$10$O.FB8qtzyRA.WqkBje9p9ubfwZlNKWtSZ7cvuJf8I/yrmvxOkw/QK",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.887Z"
+    },
+    {
+      "id": 8,
+      "name": "Hugo Martins",
+      "login": "hugo",
+      "passwordHash": "$2a$10$QEy3utagIYCU77kdeW70B.Va6mMBa9u38L1YElNxo24zrsiuDNZSe",
+      "role": "member",
+      "createdAt": "2026-05-21T14:35:46.960Z"
+    }
+  ],
+  "companies": [
+    {
+      "id": 1,
+      "name": "Carbone",
+      "slug": "carbone",
+      "createdAt": "2026-05-21T14:35:46.961Z"
+    },
+    {
+      "id": 2,
+      "name": "Seubone",
+      "slug": "seubone",
+      "createdAt": "2026-05-21T14:35:46.961Z"
+    },
+    {
+      "id": 3,
+      "name": "Onevo",
+      "slug": "onevo",
+      "createdAt": "2026-05-21T14:35:46.961Z"
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "userId": 1,
+      "companyId": 1,
+      "startAt": "2026-05-21T14:35:47.063Z",
+      "endAt": "2026-05-21T14:35:47.074Z",
+      "createdAt": "2026-05-21T14:35:47.063Z"
+    }
+  ]
+}

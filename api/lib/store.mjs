@@ -1,13 +1,19 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
-import { getStore } from '@netlify/blobs';
+import { Redis } from '@upstash/redis';
 
-const FILE_DIR = path.join(__dirname, '..', '..', '..', 'data');
-const FILE_PATH = path.join(FILE_DIR, 'netlify-store.json');
-const STORE_NAME = 'team-hours';
-const STORE_KEY = 'state';
+function getRedis() {
+  return Redis.fromEnv();
+}
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const FILE_DIR = path.join(__dirname, '..', '..', 'data');
+const FILE_PATH = path.join(FILE_DIR, 'store.json');
+const STORE_KEY = 'team-hours-state';
 const SCHEMA_VERSION = 2;
 
 const SEED_USERS = [
@@ -23,17 +29,13 @@ const SEED_USERS = [
 const SEED_COMPANIES = [
   { id: 1, name: 'Carbone', slug: 'carbone' },
   { id: 2, name: 'Seubone', slug: 'seubone' },
-  { id: 3, name: 'Onevo', slug: 'onevo' },
+  { id: 3, name: 'Onevo',   slug: 'onevo' },
 ];
 
 function createInitialState() {
   return {
     schemaVersion: SCHEMA_VERSION,
-    nextIds: {
-      user: 8,
-      company: 4,
-      entry: 1,
-    },
+    nextIds: { user: 8, company: 4, entry: 1 },
     users: SEED_USERS.map(user => ({
       id: user.id,
       name: user.name,
@@ -52,14 +54,8 @@ function createInitialState() {
   };
 }
 
-function isNetlifyRuntime() {
-  return !!process.env.NETLIFY_BLOBS_CONTEXT || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-}
-
-function getNetlifyStore(netlifyContext) {
-  const opts = { name: STORE_NAME, consistency: 'strong' };
-  if (netlifyContext) opts.netlifyContext = netlifyContext;
-  return getStore(opts);
+function isVercelRuntime() {
+  return !!process.env.UPSTASH_REDIS_REST_URL || !!process.env.VERCEL;
 }
 
 function clone(value) {
@@ -83,7 +79,6 @@ function applyMigrations(state) {
 
   if (hasNewUsers && versionOk) return false;
 
-  // Replace users with current seed (preserves companies and entries)
   const fresh = createInitialState();
   state.users = fresh.users;
   state.nextIds.user = fresh.nextIds.user;
@@ -91,28 +86,34 @@ function applyMigrations(state) {
   return true;
 }
 
-async function readStateWithMeta(netlifyContext = null) {
-  if (isNetlifyRuntime()) {
-    const store = getNetlifyStore(netlifyContext);
-    let entry = await store.getWithMetadata(STORE_KEY, { type: 'json' });
-    if (!entry) {
+async function readStateWithMeta() {
+  if (isVercelRuntime()) {
+    const redis = getRedis();
+    let state = await redis.get(STORE_KEY);
+
+    if (!state) {
       const initialState = createInitialState();
-      const created = await store.setJSON(STORE_KEY, initialState, { onlyIfNew: true });
-      if (!created.modified) {
-        entry = await store.getWithMetadata(STORE_KEY, { type: 'json' });
+      // SET NX: only set if key does not exist; returns 'OK' if set, null if already exists
+      const result = await redis.set(STORE_KEY, JSON.stringify(initialState), { nx: true });
+      if (result === null) {
+        state = await redis.get(STORE_KEY);
+        state = typeof state === 'string' ? JSON.parse(state) : state;
       } else {
-        return { state: initialState, etag: created.etag || null };
+        return { state: initialState, etag: null };
       }
+    } else if (typeof state === 'string') {
+      state = JSON.parse(state);
     }
 
-    const state = entry.data;
     if (applyMigrations(state)) {
-      await store.setJSON(STORE_KEY, state);
+      await redis.set(STORE_KEY, JSON.stringify(state));
       return { state, etag: null };
     }
-    return { state, etag: entry.etag };
+
+    return { state, etag: null };
   }
 
+  // Local filesystem fallback
   ensureLocalDir();
   if (!fs.existsSync(FILE_PATH)) {
     const initialState = createInitialState();
@@ -128,22 +129,14 @@ async function readStateWithMeta(netlifyContext = null) {
   return { state, etag: hashState(state) };
 }
 
-async function writeState(nextState, expectedEtag, netlifyContext = null) {
-  if (isNetlifyRuntime()) {
-    const store = getNetlifyStore(netlifyContext);
-    const result = expectedEtag
-      ? await store.setJSON(STORE_KEY, nextState, { onlyIfMatch: expectedEtag })
-      : await store.setJSON(STORE_KEY, nextState, { onlyIfNew: true });
-
-    if (!result.modified) {
-      const error = new Error('State conflict');
-      error.code = 'STATE_CONFLICT';
-      throw error;
-    }
-
-    return result.etag || null;
+async function writeState(nextState, expectedEtag) {
+  if (isVercelRuntime()) {
+    const redis = getRedis();
+    await redis.set(STORE_KEY, JSON.stringify(nextState));
+    return null;
   }
 
+  // Local filesystem fallback with optimistic locking
   ensureLocalDir();
   if (expectedEtag && fs.existsSync(FILE_PATH)) {
     const current = JSON.parse(fs.readFileSync(FILE_PATH, 'utf8'));
@@ -158,14 +151,14 @@ async function writeState(nextState, expectedEtag, netlifyContext = null) {
   return hashState(nextState);
 }
 
-async function updateState(mutator, retries = 4, netlifyContext = null) {
+async function updateState(mutator, retries = 4) {
   for (let attempt = 0; attempt < retries; attempt += 1) {
-    const { state, etag } = await readStateWithMeta(netlifyContext);
+    const { state, etag } = await readStateWithMeta();
     const draft = clone(state);
     const result = await mutator(draft);
 
     try {
-      const nextEtag = await writeState(draft, etag, netlifyContext);
+      const nextEtag = await writeState(draft, etag);
       return { state: draft, etag: nextEtag, result };
     } catch (error) {
       if (error.code === 'STATE_CONFLICT' && attempt < retries - 1) {
@@ -178,11 +171,11 @@ async function updateState(mutator, retries = 4, netlifyContext = null) {
   throw new Error('Falha ao atualizar o armazenamento compartilhado.');
 }
 
-async function resetToSeed(netlifyContext = null) {
+async function resetToSeed() {
   const freshState = createInitialState();
-  if (isNetlifyRuntime()) {
-    const store = getNetlifyStore(netlifyContext);
-    await store.setJSON(STORE_KEY, freshState);
+  if (isVercelRuntime()) {
+    const redis = getRedis();
+    await redis.set(STORE_KEY, JSON.stringify(freshState));
   } else {
     ensureLocalDir();
     fs.writeFileSync(FILE_PATH, JSON.stringify(freshState, null, 2));

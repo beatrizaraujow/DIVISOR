@@ -4,7 +4,7 @@ const COOKIE_NAME = 'team_hours_session';
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
 function getSecret() {
-  return process.env.SESSION_SECRET || 'local-netlify-session-secret';
+  return process.env.SESSION_SECRET || 'local-dev-session-secret';
 }
 
 function base64UrlEncode(input) {
@@ -77,6 +77,8 @@ function serializeCookie(name, value, options = {}) {
 }
 
 function isSecureRequest() {
+  // On Vercel, all deployed URLs use HTTPS
+  if (process.env.VERCEL_URL) return true;
   return process.env.URL ? process.env.URL.startsWith('https://') : false;
 }
 
