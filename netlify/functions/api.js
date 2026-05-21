@@ -1,46 +1,51 @@
-const bcrypt = require('bcryptjs');
-const { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromEvent } = require('./lib/auth');
-const { readStateWithMeta, updateState } = require('./lib/store');
+import bcrypt from 'bcryptjs';
+import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } from './lib/auth.js';
+import { readStateWithMeta, updateState } from './lib/store.js';
 
-exports.handler = async (event) => {
+export const config = {
+  path: ['/api/*'],
+};
+
+export default async function handler(req) {
   try {
     const stateMeta = await readStateWithMeta();
-    const route = normalizePath(event.path);
-    const method = event.httpMethod.toUpperCase();
+    const url = new URL(req.url);
+    const route = normalizePath(url.pathname);
+    const method = req.method.toUpperCase();
 
     if (method === 'GET' && route === '/session') {
-      return await handleSession(event, stateMeta.state);
+      return handleSession(req, stateMeta.state);
     }
     if (method === 'POST' && route === '/login') {
-      return await handleLogin(event, stateMeta.state);
+      return await handleLogin(req, stateMeta.state);
     }
     if (method === 'POST' && route === '/logout') {
-      return await requireAuth(event, stateMeta.state, () => handleLogout());
+      return await requireAuth(req, stateMeta.state, () => handleLogout());
     }
     if (method === 'GET' && route === '/dashboard') {
-      return await requireAuth(event, stateMeta.state, user => handleDashboard(stateMeta.state, user));
+      return await requireAuth(req, stateMeta.state, user => handleDashboard(stateMeta.state, user));
     }
     if (method === 'POST' && route === '/timer/start') {
-      return await requireAuth(event, stateMeta.state, user => handleTimerStart(event, user));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user));
     }
     if (method === 'POST' && route === '/timer/stop') {
-      return await requireAuth(event, stateMeta.state, user => handleTimerStop(user));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStop(user));
     }
     if (method === 'GET' && route === '/reports') {
-      return await requireAuth(event, stateMeta.state, user => handleReports(event, stateMeta.state, user));
+      return await requireAuth(req, stateMeta.state, user => handleReports(req, stateMeta.state, user));
     }
     if (method === 'GET' && route === '/reports/export') {
-      return await requireAuth(event, stateMeta.state, user => handleReportExport(event, stateMeta.state, user));
+      return await requireAuth(req, stateMeta.state, user => handleReportExport(req, stateMeta.state, user));
     }
     if (method === 'DELETE' && route.startsWith('/entries/')) {
-      return await requireAuth(event, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user));
+      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user));
     }
 
     return json(404, { error: 'Rota nao encontrada.' });
   } catch (error) {
     return json(error.statusCode || 500, { error: error.message || 'Erro interno do servidor.' });
   }
-};
+}
 
 function normalizePath(pathname = '') {
   const prefixes = ['/.netlify/functions/api', '/api'];
@@ -54,28 +59,25 @@ function normalizePath(pathname = '') {
 }
 
 function json(statusCode, payload, extraHeaders = {}) {
-  return {
-    statusCode,
+  return new Response(JSON.stringify(payload), {
+    status: statusCode,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       ...extraHeaders,
     },
-    body: JSON.stringify(payload),
-  };
+  });
 }
 
 function text(statusCode, body, extraHeaders = {}) {
-  return {
-    statusCode,
+  return new Response(body, {
+    status: statusCode,
     headers: extraHeaders,
-    body,
-  };
+  });
 }
 
-function parseJsonBody(event) {
-  if (!event.body) return {};
+async function parseJsonBody(req) {
   try {
-    return JSON.parse(event.body);
+    return await req.json();
   } catch {
     return {};
   }
@@ -117,8 +119,8 @@ function findCompanyById(state, companyId) {
   return state.companies.find(company => company.id === Number(companyId)) || null;
 }
 
-function requireAuth(event, state, callback) {
-  const userId = getUserIdFromEvent(event);
+function requireAuth(req, state, callback) {
+  const userId = getUserIdFromRequest(req);
   const user = userId ? findUserById(state, userId) : null;
   if (!user) {
     return json(401, { error: 'Nao autenticado.' });
@@ -126,8 +128,8 @@ function requireAuth(event, state, callback) {
   return callback(publicUser(user));
 }
 
-function handleSession(event, state) {
-  const userId = getUserIdFromEvent(event);
+function handleSession(req, state) {
+  const userId = getUserIdFromRequest(req);
   const user = userId ? findUserById(state, userId) : null;
   return json(200, {
     authenticated: Boolean(user),
@@ -137,8 +139,8 @@ function handleSession(event, state) {
   });
 }
 
-function handleLogin(event, state) {
-  const body = parseJsonBody(event);
+async function handleLogin(req, state) {
+  const body = await parseJsonBody(req);
   const login = String(body.login || '').trim().toLowerCase();
   const password = String(body.password || '');
   const user = findUserByLogin(state, login);
@@ -323,8 +325,8 @@ function handleDashboard(state, user) {
   return json(200, buildDashboard(state, user));
 }
 
-async function handleTimerStart(event, user) {
-  const body = parseJsonBody(event);
+async function handleTimerStart(req, user) {
+  const body = await parseJsonBody(req);
   const companyId = Number(body.companyId);
 
   const result = await updateState(draft => {
@@ -379,8 +381,9 @@ async function handleTimerStop(user) {
   return json(200, { entry });
 }
 
-function handleReports(event, state) {
-  const query = event.queryStringParameters || {};
+function handleReports(req, state) {
+  const url = new URL(req.url);
+  const query = Object.fromEntries(url.searchParams);
   const range = parseDateRange(query);
   const filters = {
     from: range.from,
@@ -396,8 +399,9 @@ function handleReports(event, state) {
   });
 }
 
-function handleReportExport(event, state) {
-  const query = event.queryStringParameters || {};
+function handleReportExport(req, state) {
+  const url = new URL(req.url);
+  const query = Object.fromEntries(url.searchParams);
   const range = parseDateRange(query);
   const filters = {
     from: range.from,

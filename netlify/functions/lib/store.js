@@ -1,8 +1,12 @@
-const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const bcrypt = require('bcryptjs');
-const { getStore } = require('@netlify/blobs');
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
+import { getStore } from '@netlify/blobs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const FILE_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const FILE_PATH = path.join(FILE_DIR, 'netlify-store.json');
@@ -52,11 +56,7 @@ function createInitialState() {
 }
 
 function isNetlifyRuntime() {
-  return (
-    process.env.NETLIFY === 'true' ||
-    !!process.env.NETLIFY_BLOBS_CONTEXT ||
-    !!process.env.AWS_LAMBDA_FUNCTION_NAME
-  );
+  return !!process.env.NETLIFY_BLOBS_CONTEXT;
 }
 
 function clone(value) {
@@ -151,7 +151,4 @@ async function updateState(mutator, retries = 4) {
   throw new Error('Falha ao atualizar o armazenamento compartilhado.');
 }
 
-module.exports = {
-  readStateWithMeta,
-  updateState,
-};
+export { readStateWithMeta, updateState };

@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 const COOKIE_NAME = 'team_hours_session';
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -58,8 +58,8 @@ function parseCookies(headerValue = '') {
   }, {});
 }
 
-function getUserIdFromEvent(event) {
-  const cookieHeader = event.headers?.cookie || event.headers?.Cookie || '';
+export function getUserIdFromRequest(req) {
+  const cookieHeader = req.headers.get('cookie') || '';
   const cookies = parseCookies(cookieHeader);
   const session = decodeSession(cookies[COOKIE_NAME]);
   return session ? session.userId : null;
@@ -80,7 +80,7 @@ function isSecureRequest() {
   return process.env.URL ? process.env.URL.startsWith('https://') : false;
 }
 
-function buildSessionCookie(userId) {
+export function buildSessionCookie(userId) {
   return serializeCookie(COOKIE_NAME, encodeSession(userId), {
     path: '/',
     httpOnly: true,
@@ -90,7 +90,7 @@ function buildSessionCookie(userId) {
   });
 }
 
-function buildExpiredSessionCookie() {
+export function buildExpiredSessionCookie() {
   return serializeCookie(COOKIE_NAME, '', {
     path: '/',
     httpOnly: true,
@@ -100,9 +100,3 @@ function buildExpiredSessionCookie() {
     maxAge: 0,
   });
 }
-
-module.exports = {
-  buildSessionCookie,
-  buildExpiredSessionCookie,
-  getUserIdFromEvent,
-};
