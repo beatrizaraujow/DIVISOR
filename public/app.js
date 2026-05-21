@@ -129,16 +129,53 @@ function loginView() {
 
 function bindLoginView() {
   const form = document.getElementById('login-form');
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
+  if (form) {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      appState.error = '';
+      const fd = new FormData(form);
+      try {
+        await request('/api/login', { method: 'POST', body: JSON.stringify({ login: fd.get('login'), password: fd.get('password') }) });
+        appState.reportFilters = defaultFilters();
+        appState.info = '';
+        await refreshAuthenticatedView();
+        render();
+      } catch (err) { setError(err.message); }
+    });
+  }
+
+  document.getElementById('show-change-password')?.addEventListener('click', () => {
+    appState.loginMode = 'change-password';
     appState.error = '';
-    const fd = new FormData(form);
-    try {
-      await request('/api/login', { method: 'POST', body: JSON.stringify({ login: fd.get('login'), password: fd.get('password') }) });
-      appState.reportFilters = defaultFilters();
-      await refreshAuthenticatedView();
-      render();
-    } catch (err) { setError(err.message); }
+    render();
+  });
+
+  const cpForm = document.getElementById('change-password-form');
+  if (cpForm) {
+    cpForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      appState.error = '';
+      const fd = new FormData(cpForm);
+      const login = fd.get('login');
+      const currentPassword = fd.get('currentPassword');
+      const newPassword = fd.get('newPassword');
+      const confirmPassword = fd.get('confirmPassword');
+      if (newPassword !== confirmPassword) { setError('As senhas n\u00e3o coincidem.'); return; }
+      if (newPassword.length < 4) { setError('A nova senha deve ter ao menos 4 caracteres.'); return; }
+      try {
+        await request('/api/password', { method: 'POST', body: JSON.stringify({ login, currentPassword, newPassword }) });
+        appState.loginMode = 'login';
+        appState.error = '';
+        appState.info = '\u2713 Senha alterada com sucesso. Fa\u00e7a login com a nova senha.';
+        render();
+      } catch (err) { setError(err.message); }
+    });
+  }
+
+  document.getElementById('back-to-login')?.addEventListener('click', () => {
+    appState.loginMode = 'login';
+    appState.error = '';
+    render();
   });
 }
 
