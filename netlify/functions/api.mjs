@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } from './lib/auth.js';
-import { readStateWithMeta, updateState } from './lib/store.js';
+import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } from './lib/auth.mjs';
+import { readStateWithMeta, updateState } from './lib/store.mjs';
 
 export const config = {
   path: '/api/*',
