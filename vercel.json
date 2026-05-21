@@ -1,5 +1,8 @@
 {
+  "framework": null,
   "outputDirectory": "public",
+  "buildCommand": "",
+  "installCommand": "npm install",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
