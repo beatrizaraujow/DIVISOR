@@ -52,7 +52,7 @@ function createInitialState() {
 }
 
 function isNetlifyRuntime() {
-  return process.env.NETLIFY === 'true';
+  return process.env.NETLIFY === 'true' || !!process.env.NETLIFY_BLOBS_CONTEXT;
 }
 
 function clone(value) {
