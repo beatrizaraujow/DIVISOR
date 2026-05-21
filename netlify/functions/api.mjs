@@ -3,7 +3,7 @@ import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } f
 import { readStateWithMeta, updateState } from './lib/store.js';
 
 export const config = {
-  path: ['/api/*'],
+  path: '/api/*',
 };
 
 export default async function handler(req, context) {
