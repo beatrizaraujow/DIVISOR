@@ -95,9 +95,13 @@ function setError(message) { appState.error = message; render(); }
 async function boot() {
   try {
     await loadSession();
-    if (appState.session.authenticated) await Promise.all([loadDashboard(), loadReports()]);
-    render();
+  } catch {
+    appState.session = { authenticated: false, user: null, companies: [], users: [] };
+  }
+  try {
+    if (appState.session?.authenticated) await Promise.all([loadDashboard(), loadReports()]);
   } catch (error) { setError(error.message); }
+  render();
 }
 
 function render() {
