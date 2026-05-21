@@ -56,7 +56,13 @@ function createInitialState() {
 }
 
 function isNetlifyRuntime() {
-  return !!process.env.NETLIFY_BLOBS_CONTEXT;
+  return !!process.env.NETLIFY_BLOBS_CONTEXT || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+}
+
+function getNetlifyStore(netlifyContext) {
+  const opts = { name: STORE_NAME, consistency: 'strong' };
+  if (netlifyContext) opts.netlifyContext = netlifyContext;
+  return getStore(opts);
 }
 
 function clone(value) {
@@ -73,9 +79,9 @@ function ensureLocalDir() {
   }
 }
 
-async function readStateWithMeta() {
+async function readStateWithMeta(netlifyContext = null) {
   if (isNetlifyRuntime()) {
-    const store = getStore({ name: STORE_NAME, consistency: 'strong' });
+    const store = getNetlifyStore(netlifyContext);
     let entry = await store.getWithMetadata(STORE_KEY, { type: 'json' });
     if (!entry) {
       const initialState = createInitialState();
@@ -101,9 +107,9 @@ async function readStateWithMeta() {
   return { state, etag: hashState(state) };
 }
 
-async function writeState(nextState, expectedEtag) {
+async function writeState(nextState, expectedEtag, netlifyContext = null) {
   if (isNetlifyRuntime()) {
-    const store = getStore({ name: STORE_NAME, consistency: 'strong' });
+    const store = getNetlifyStore(netlifyContext);
     const result = expectedEtag
       ? await store.setJSON(STORE_KEY, nextState, { onlyIfMatch: expectedEtag })
       : await store.setJSON(STORE_KEY, nextState, { onlyIfNew: true });
@@ -131,14 +137,14 @@ async function writeState(nextState, expectedEtag) {
   return hashState(nextState);
 }
 
-async function updateState(mutator, retries = 4) {
+async function updateState(mutator, retries = 4, netlifyContext = null) {
   for (let attempt = 0; attempt < retries; attempt += 1) {
-    const { state, etag } = await readStateWithMeta();
+    const { state, etag } = await readStateWithMeta(netlifyContext);
     const draft = clone(state);
     const result = await mutator(draft);
 
     try {
-      const nextEtag = await writeState(draft, etag);
+      const nextEtag = await writeState(draft, etag, netlifyContext);
       return { state: draft, etag: nextEtag, result };
     } catch (error) {
       if (error.code === 'STATE_CONFLICT' && attempt < retries - 1) {

@@ -6,9 +6,9 @@ export const config = {
   path: ['/api/*'],
 };
 
-export default async function handler(req) {
+export default async function handler(req, context) {
   try {
-    const stateMeta = await readStateWithMeta();
+    const stateMeta = await readStateWithMeta(context);
     const url = new URL(req.url);
     const route = normalizePath(url.pathname);
     const method = req.method.toUpperCase();
@@ -26,10 +26,10 @@ export default async function handler(req) {
       return await requireAuth(req, stateMeta.state, user => handleDashboard(stateMeta.state, user));
     }
     if (method === 'POST' && route === '/timer/start') {
-      return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user, context));
     }
     if (method === 'POST' && route === '/timer/stop') {
-      return await requireAuth(req, stateMeta.state, user => handleTimerStop(user));
+      return await requireAuth(req, stateMeta.state, user => handleTimerStop(user, context));
     }
     if (method === 'GET' && route === '/reports') {
       return await requireAuth(req, stateMeta.state, user => handleReports(req, stateMeta.state, user));
@@ -38,7 +38,7 @@ export default async function handler(req) {
       return await requireAuth(req, stateMeta.state, user => handleReportExport(req, stateMeta.state, user));
     }
     if (method === 'DELETE' && route.startsWith('/entries/')) {
-      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user));
+      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user, context));
     }
 
     return json(404, { error: 'Rota nao encontrada.' });
@@ -325,7 +325,7 @@ function handleDashboard(state, user) {
   return json(200, buildDashboard(state, user));
 }
 
-async function handleTimerStart(req, user) {
+async function handleTimerStart(req, user, context) {
   const body = await parseJsonBody(req);
   const companyId = Number(body.companyId);
 
@@ -354,13 +354,13 @@ async function handleTimerStart(req, user) {
     draft.nextIds.entry += 1;
     draft.entries.push(entry);
     return entry.id;
-  });
+  }, 4, context);
 
   const entry = mapEntry(result.state, result.state.entries.find(item => item.id === result.result));
   return json(201, { entry });
 }
 
-async function handleTimerStop(user) {
+async function handleTimerStop(user, context) {
   const result = await updateState(draft => {
     const activeEntry = draft.entries
       .filter(entry => entry.userId === user.id && !entry.endAt)
@@ -375,7 +375,7 @@ async function handleTimerStop(user) {
 
     activeEntry.endAt = new Date().toISOString();
     return activeEntry.id;
-  });
+  }, 4, context);
 
   const entry = mapEntry(result.state, result.state.entries.find(item => item.id === result.result));
   return json(200, { entry });
@@ -429,7 +429,7 @@ function handleReportExport(req, state) {
   });
 }
 
-async function handleDeleteEntry(route, state, user) {
+async function handleDeleteEntry(route, state, user, context) {
   const entryId = Number(route.split('/').pop());
   const existing = state.entries.find(entry => entry.id === entryId);
 
@@ -445,7 +445,7 @@ async function handleDeleteEntry(route, state, user) {
 
   await updateState(draft => {
     draft.entries = draft.entries.filter(entry => entry.id !== entryId);
-  });
+  }, 4, context);
 
   return json(200, { ok: true });
 }
