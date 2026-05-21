@@ -127,63 +127,30 @@ function render() {
 }
 
 function loginView() {
-  const errorHtml = appState.error ? `<div class="error">${appState.error}</div>` : '';
+  const errorHtml = appState.error ? `<div class="lp-error">${appState.error}</div>` : '';
 
   return `
-    <main class="login-shell">
-      <div class="login-grid">
-        <section class="login-card">
-          <span class="status live">Backend ativo e banco compartilhado</span>
-          <h1>Painel de horas com login real</h1>
-          <p>Esta versao troca o armazenamento local por um servidor com banco de dados e sessao autenticada. Cada colaborador entra com a propria conta e registra as horas diretamente na empresa correta.</p>
-
-          <div class="helper-grid">
-            <div class="helper">
-              <strong>Login autenticado</strong>
-              <span class="muted">Sessao no servidor e senha protegida por hash.</span>
-            </div>
-            <div class="helper">
-              <strong>Dados centralizados</strong>
-              <span class="muted">As horas deixam de depender do navegador local e passam ao banco do projeto.</span>
-            </div>
-            <div class="helper">
-              <strong>Relatorios exportaveis</strong>
-              <span class="muted">Filtro por periodo, empresa e colaborador com exportacao CSV.</span>
-            </div>
-          </div>
-
-          <h2>Usuarios iniciais</h2>
-          <p class="muted">Senha padrao atual para todos: <strong>1234</strong>.</p>
-          <div class="credentials-grid">
-            ${[
-              ['Ana Beatriz', 'ana'], ['Bruno Costa', 'bruno'], ['Carla Souza', 'carla'], ['Diego Lima', 'diego'],
-              ['Elisa Rocha', 'elisa'], ['Felipe Nunes', 'felipe'], ['Giovana Alves', 'giovana'], ['Hugo Martins', 'hugo']
-            ].map(([name, login]) => `
-              <div class="credential">
-                <strong>${name}</strong>
-                <span class="muted">Login: ${login}</span>
-              </div>
-            `).join('')}
-          </div>
-        </section>
-
-        <section class="login-card">
-          <h2>Acessar sistema</h2>
-          <p>Entre com seu usuario da equipe.</p>
+    <main class="login-page">
+      <div class="lp-left">
+        <img src="/logo.png" alt="logo" class="lp-logo" />
+      </div>
+      <div class="lp-right">
+        <div class="lp-watermark">45</div>
+        <div class="lp-card">
+          <h2 class="lp-title">login</h2>
           ${errorHtml}
           <form id="login-form">
-            <div class="field">
-              <label for="login">Login</label>
-              <input id="login" name="login" autocomplete="username" placeholder="Ex.: ana" required />
+            <div class="lp-field">
+              <label class="lp-label" for="login">name:</label>
+              <input class="lp-input" id="login" name="login" autocomplete="username" placeholder="usuario" required />
             </div>
-            <div class="field">
-              <label for="password">Senha</label>
-              <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite a senha" required />
-              <small>Troque essas credenciais depois se for publicar.</small>
+            <div class="lp-field">
+              <label class="lp-label" for="password">senha:</label>
+              <input class="lp-input" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
             </div>
-            <button class="btn" type="submit">Entrar</button>
+            <button class="lp-btn" type="submit">entrar</button>
           </form>
-        </section>
+        </div>
       </div>
     </main>
   `;
