@@ -50,14 +50,26 @@ function fmtLive(startAt) {
 }
 
 async function request(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options,
+    });
+  } catch (networkErr) {
+    throw new Error('Sem conexão com o servidor.');
+  }
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || 'Falha na requisicao.');
+    let errMsg;
+    try {
+      const data = await response.json();
+      errMsg = data.error || `Erro ${response.status}`;
+    } catch {
+      const text = await response.text().catch(() => '');
+      errMsg = text.slice(0, 120) || `Erro ${response.status}`;
+    }
+    throw new Error(errMsg);
   }
   const contentType = response.headers.get('Content-Type') || '';
   if (contentType.includes('application/json')) return response.json();
