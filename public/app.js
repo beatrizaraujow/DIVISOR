@@ -387,10 +387,6 @@ function dashboardView() {
   return `
     <div class="nd-layout">
       <aside class="nd-sidebar">
-        <div class="nd-brand">
-          <div class="nd-brand-icon">H</div>
-          <span class="nd-brand-text">Horas</span>
-        </div>
         <div class="nd-user">
           <div class="nd-avatar">${user.name.charAt(0).toUpperCase()}</div>
           <div>
