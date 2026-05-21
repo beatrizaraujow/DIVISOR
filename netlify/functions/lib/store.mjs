@@ -77,9 +77,13 @@ function ensureLocalDir() {
 }
 
 function applyMigrations(state) {
-  const version = state.schemaVersion || 1;
-  if (version >= SCHEMA_VERSION) return false;
-  // v2: replace users with current seed (keeps entries/companies intact)
+  const seedLogins = new Set(SEED_USERS.map(u => u.login));
+  const hasNewUsers = Array.isArray(state.users) && state.users.some(u => seedLogins.has(u.login));
+  const versionOk = (state.schemaVersion || 1) >= SCHEMA_VERSION;
+
+  if (hasNewUsers && versionOk) return false;
+
+  // Replace users with current seed (preserves companies and entries)
   const fresh = createInitialState();
   state.users = fresh.users;
   state.nextIds.user = fresh.nextIds.user;
