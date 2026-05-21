@@ -10,14 +10,13 @@ const STORE_NAME = 'team-hours';
 const STORE_KEY = 'state';
 
 const SEED_USERS = [
-  { id: 1, name: 'Ana Beatriz', login: 'ana', password: '1234', role: 'admin' },
-  { id: 2, name: 'Bruno Costa', login: 'bruno', password: '1234', role: 'member' },
-  { id: 3, name: 'Carla Souza', login: 'carla', password: '1234', role: 'member' },
-  { id: 4, name: 'Diego Lima', login: 'diego', password: '1234', role: 'member' },
-  { id: 5, name: 'Elisa Rocha', login: 'elisa', password: '1234', role: 'member' },
-  { id: 6, name: 'Felipe Nunes', login: 'felipe', password: '1234', role: 'member' },
-  { id: 7, name: 'Giovana Alves', login: 'giovana', password: '1234', role: 'member' },
-  { id: 8, name: 'Hugo Martins', login: 'hugo', password: '1234', role: 'member' },
+  { id: 1, name: 'Bia',         login: 'bia',        password: '1234', role: 'admin' },
+  { id: 2, name: 'Zion',        login: 'zion',       password: '1234', role: 'user' },
+  { id: 3, name: 'Maria Clara', login: 'mariaclara', password: '1234', role: 'user' },
+  { id: 4, name: 'Malu',        login: 'malu',       password: '1234', role: 'user' },
+  { id: 5, name: 'Thiago',      login: 'thiago',     password: '1234', role: 'user' },
+  { id: 6, name: 'Samuel',      login: 'samuel',     password: '1234', role: 'user' },
+  { id: 7, name: 'Klenio',      login: 'klenio',     password: '1234', role: 'user' },
 ];
 
 const SEED_COMPANIES = [
@@ -29,7 +28,7 @@ const SEED_COMPANIES = [
 function createInitialState() {
   return {
     nextIds: {
-      user: 9,
+      user: 8,
       company: 4,
       entry: 1,
     },
@@ -153,4 +152,15 @@ async function updateState(mutator, retries = 4, netlifyContext = null) {
   throw new Error('Falha ao atualizar o armazenamento compartilhado.');
 }
 
-export { readStateWithMeta, updateState };
+async function resetToSeed(netlifyContext = null) {
+  const freshState = createInitialState();
+  if (isNetlifyRuntime()) {
+    const store = getNetlifyStore(netlifyContext);
+    await store.setJSON(STORE_KEY, freshState);
+  } else {
+    ensureLocalDir();
+    fs.writeFileSync(FILE_PATH, JSON.stringify(freshState, null, 2));
+  }
+}
+
+export { readStateWithMeta, updateState, resetToSeed };

@@ -89,6 +89,26 @@ body {
   margin-bottom: 20px;
 }
 
+.lp-info {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.87rem;
+  color: #6ee7b7;
+  margin-bottom: 20px;
+}
+
+.db-admin-body {
+  padding: 16px 20px;
+}
+
+.db-admin-desc {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  margin: 0 0 14px;
+}
+
 .lp-field {
   display: flex;
   flex-direction: column;

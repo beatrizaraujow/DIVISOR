@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { buildSessionCookie, buildExpiredSessionCookie, getUserIdFromRequest } from './lib/auth.mjs';
-import { readStateWithMeta, updateState } from './lib/store.mjs';
+import { readStateWithMeta, updateState, resetToSeed } from './lib/store.mjs';
 
 export const config = {
   path: '/api/*',
@@ -39,6 +39,12 @@ export default async function handler(req, context) {
     }
     if (method === 'DELETE' && route.startsWith('/entries/')) {
       return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user, context));
+    }
+    if (method === 'POST' && route === '/password') {
+      return await handleChangePassword(req, stateMeta.state, context);
+    }
+    if (method === 'POST' && route === '/reset') {
+      return await requireAuth(req, stateMeta.state, user => handleReset(user, context));
     }
 
     return json(404, { error: 'Rota nao encontrada.' });
@@ -456,5 +462,33 @@ function csvEscape(value) {
     return `"${textValue.replace(/"/g, '""')}"`;
   }
   return textValue;
+}
+
+async function handleChangePassword(req, state, context) {
+  const { login, currentPassword, newPassword } = await parseJsonBody(req);
+  if (!login || !currentPassword || !newPassword) {
+    return json(400, { error: 'Dados incompletos.' });
+  }
+  if (newPassword.length < 4) {
+    return json(400, { error: 'A nova senha deve ter ao menos 4 caracteres.' });
+  }
+  const user = findUserByLogin(state, login);
+  if (!user || !bcrypt.compareSync(currentPassword, user.passwordHash)) {
+    return json(401, { error: 'Login ou senha atual incorretos.' });
+  }
+  const newHash = bcrypt.hashSync(newPassword, 10);
+  await updateState(draft => {
+    const u = draft.users.find(item => item.login === login);
+    if (u) u.passwordHash = newHash;
+  }, 4, context);
+  return json(200, { ok: true });
+}
+
+async function handleReset(user, context) {
+  if (user.role !== 'admin') {
+    return json(403, { error: 'Apenas administradores podem resetar o banco de dados.' });
+  }
+  await resetToSeed(context);
+  return json(200, { ok: true, message: 'Banco de dados resetado com os usuarios iniciais.' });
 }
 

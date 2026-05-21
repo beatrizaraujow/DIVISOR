@@ -4,6 +4,8 @@
   reports: null,
   loading: false,
   error: '',
+  info: '',
+  loginMode: 'login',
   reportFilters: defaultFilters(),
   goals: JSON.parse(localStorage.getItem('mktime_goals') || '{"daily":480,"weekly":2400}'),
   chartMode: 'week',
@@ -404,6 +406,18 @@ function dashboardView() {
                 </table>
               </div>` : '<p class="db-empty">Nenhum registro. Inicie um cronometro para comecar.</p>'}
           </div>
+
+          ${user.role === 'admin' ? `
+          <div class="db-card">
+            <div class="db-card-head">
+              <h3>Administração</h3>
+              <span class="db-badge off">Admin only</span>
+            </div>
+            <div class="db-admin-body">
+              <p class="db-admin-desc">Reseta o banco de dados para o estado inicial com os novos usuários seed. <strong>Todos os registros de horas serão apagados.</strong></p>
+              <button class="db-timer-btn stop" id="reset-store-btn">Resetar banco de dados</button>
+            </div>
+          </div>` : ''}
         </div>
       </div>
     </div>`;
@@ -474,6 +488,18 @@ function bindDashboardView() {
 
   document.getElementById('export-btn')?.addEventListener('click', () => {
     window.open('/api/reports/export', '_blank');
+  });
+
+  document.getElementById('reset-store-btn')?.addEventListener('click', async () => {
+    if (!confirm('Tem certeza? Isso apagara TODOS os registros de horas e redefinira os usuarios.')) return;
+    try {
+      await request('/api/reset', { method: 'POST' });
+      await request('/api/logout', { method: 'POST' });
+      appState.session = { authenticated: false }; appState.dashboard = null;
+      appState.reports = null; appState.error = '';
+      appState.info = '\u2713 Banco de dados resetado. Faca login com os novos usuarios.';
+      render();
+    } catch (e) { setError(e.message); }
   });
 
   startLiveTicker();
