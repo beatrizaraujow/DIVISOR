@@ -42,10 +42,17 @@ body {
 }
 
 .lp-logo {
-  width: 72%;
-  max-height: 80vh;
+  width: 88%;
+  max-height: 88vh;
   object-fit: contain;
   display: block;
+  animation: bee-float 3.6s ease-in-out infinite;
+}
+
+@keyframes bee-float {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-22px); }
+  100% { transform: translateY(0px); }
 }
 
 .lp-right {
