@@ -6,6 +6,11 @@ import bcrypt from 'bcryptjs';
 import { Redis } from '@upstash/redis';
 
 function getRedis() {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const err = new Error('Redis não configurado. Defina UPSTASH_REDIS_REST_URL e UPSTASH_REDIS_REST_TOKEN nas variáveis de ambiente do Vercel.');
+    err.statusCode = 503;
+    throw err;
+  }
   return Redis.fromEnv();
 }
 
@@ -55,7 +60,7 @@ function createInitialState() {
 }
 
 function isVercelRuntime() {
-  return !!process.env.UPSTASH_REDIS_REST_URL || !!process.env.VERCEL;
+  return !!process.env.UPSTASH_REDIS_REST_URL;
 }
 
 function clone(value) {
