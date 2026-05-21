@@ -1,12 +1,8 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import { getStore } from '@netlify/blobs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const FILE_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const FILE_PATH = path.join(FILE_DIR, 'netlify-store.json');
