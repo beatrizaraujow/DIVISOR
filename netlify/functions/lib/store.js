@@ -52,7 +52,11 @@ function createInitialState() {
 }
 
 function isNetlifyRuntime() {
-  return process.env.NETLIFY === 'true' || !!process.env.NETLIFY_BLOBS_CONTEXT;
+  return (
+    process.env.NETLIFY === 'true' ||
+    !!process.env.NETLIFY_BLOBS_CONTEXT ||
+    !!process.env.AWS_LAMBDA_FUNCTION_NAME
+  );
 }
 
 function clone(value) {
