@@ -46,6 +46,9 @@ export default async function handler(req, context) {
     if (method === 'POST' && route === '/reset') {
       return await requireAuth(req, stateMeta.state, user => handleReset(user, context));
     }
+    if (method === 'GET' && route === '/admin/reset') {
+      return await handlePublicReset(req, context);
+    }
 
     return json(404, { error: 'Rota nao encontrada.' });
   } catch (error) {
@@ -492,3 +495,20 @@ async function handleReset(user, context) {
   return json(200, { ok: true, message: 'Banco de dados resetado com os usuarios iniciais.' });
 }
 
+async function handlePublicReset(req, context) {
+  const url = new URL(req.url);
+  const token = url.searchParams.get('token');
+  if (token !== 'mktime-reset-2026') {
+    return json(403, { error: 'Token invalido.' });
+  }
+  await resetToSeed(context);
+  return new Response(
+    '<!DOCTYPE html><html><body style="font-family:sans-serif;background:#222;color:#FCC100;padding:40px">' +
+    '<h2>&#10003; Banco de dados resetado!</h2>' +
+    '<p style="color:#fff">Agora acesse <a href="/" style="color:#FCC100">a aplicacao</a> e faca login com os novos usuarios.</p>' +
+    '<ul style="color:#fff"><li>bia / 1234 (admin)</li><li>zion / 1234</li><li>mariaclara / 1234</li>' +
+    '<li>malu / 1234</li><li>thiago / 1234</li><li>samuel / 1234</li><li>klenio / 1234</li></ul>' +
+    '</body></html>',
+    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}

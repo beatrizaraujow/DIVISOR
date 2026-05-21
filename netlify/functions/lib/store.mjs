@@ -12,7 +12,7 @@ const STORE_KEY = 'state';
 const SEED_USERS = [
   { id: 1, name: 'Bia',         login: 'bia',        password: '1234', role: 'admin' },
   { id: 2, name: 'Zion',        login: 'zion',       password: '1234', role: 'user' },
-  { id: 3, name: 'Maria Clara', login: 'mariaclara', password: '1234', role: 'user' },
+  { id: 3, name: 'Maria Clara', login: 'mariaclara', password: '1234', role: 'admin' },
   { id: 4, name: 'Malu',        login: 'malu',       password: '1234', role: 'user' },
   { id: 5, name: 'Thiago',      login: 'thiago',     password: '1234', role: 'user' },
   { id: 6, name: 'Samuel',      login: 'samuel',     password: '1234', role: 'user' },
