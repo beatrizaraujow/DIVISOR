@@ -8,6 +8,7 @@ const FILE_DIR = path.join(__dirname, '..', '..', '..', 'data');
 const FILE_PATH = path.join(FILE_DIR, 'netlify-store.json');
 const STORE_NAME = 'team-hours';
 const STORE_KEY = 'state';
+const SCHEMA_VERSION = 2;
 
 const SEED_USERS = [
   { id: 1, name: 'Bia',         login: 'bia',        password: '1234', role: 'admin' },
@@ -27,6 +28,7 @@ const SEED_COMPANIES = [
 
 function createInitialState() {
   return {
+    schemaVersion: SCHEMA_VERSION,
     nextIds: {
       user: 8,
       company: 4,
@@ -74,6 +76,17 @@ function ensureLocalDir() {
   }
 }
 
+function applyMigrations(state) {
+  const version = state.schemaVersion || 1;
+  if (version >= SCHEMA_VERSION) return false;
+  // v2: replace users with current seed (keeps entries/companies intact)
+  const fresh = createInitialState();
+  state.users = fresh.users;
+  state.nextIds.user = fresh.nextIds.user;
+  state.schemaVersion = SCHEMA_VERSION;
+  return true;
+}
+
 async function readStateWithMeta(netlifyContext = null) {
   if (isNetlifyRuntime()) {
     const store = getNetlifyStore(netlifyContext);
@@ -88,7 +101,12 @@ async function readStateWithMeta(netlifyContext = null) {
       }
     }
 
-    return { state: entry.data, etag: entry.etag };
+    const state = entry.data;
+    if (applyMigrations(state)) {
+      await store.setJSON(STORE_KEY, state);
+      return { state, etag: null };
+    }
+    return { state, etag: entry.etag };
   }
 
   ensureLocalDir();
@@ -99,6 +117,10 @@ async function readStateWithMeta(netlifyContext = null) {
   }
 
   const state = JSON.parse(fs.readFileSync(FILE_PATH, 'utf8'));
+  if (applyMigrations(state)) {
+    fs.writeFileSync(FILE_PATH, JSON.stringify(state, null, 2));
+    return { state, etag: hashState(state) };
+  }
   return { state, etag: hashState(state) };
 }
 
