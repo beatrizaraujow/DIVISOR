@@ -135,21 +135,21 @@ function loginView() {
         <img src="/logo/logo.png" alt="logo" class="lp-logo" />
       </div>
       <div class="lp-right">
-        <div class="lp-watermark">45</div>
         <div class="lp-card">
-          <h2 class="lp-title">login</h2>
+          <h2 class="lp-title">Entrar</h2>
           ${errorHtml}
           <form id="login-form">
             <div class="lp-field">
-              <label class="lp-label" for="login">name:</label>
-              <input class="lp-input" id="login" name="login" autocomplete="username" placeholder="usuario" required />
+              <label class="lp-label" for="login">NOME</label>
+              <input class="lp-input" id="login" name="login" autocomplete="username" placeholder="seu nome" required />
             </div>
             <div class="lp-field">
-              <label class="lp-label" for="password">senha:</label>
+              <label class="lp-label" for="password">SENHA</label>
               <input class="lp-input" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
             </div>
-            <button class="lp-btn" type="submit">entrar</button>
+            <button class="lp-btn" type="submit">ACESSAR</button>
           </form>
+          <span class="lp-link">Alterar senha</span>
         </div>
       </div>
     </main>

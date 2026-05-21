@@ -33,9 +33,9 @@ body {
 }
 
 .lp-left {
-  width: 44%;
-  background-color: #f0b400;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23grain)' opacity='0.11'/%3E%3C/svg%3E");
+  width: 50%;
+  background-color: #111111;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='250' height='250' filter='url(%23grain)' opacity='0.13'/%3E%3C/svg%3E");
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,8 +43,8 @@ body {
 }
 
 .lp-logo {
-  width: 88%;
-  max-height: 88vh;
+  width: 78%;
+  max-height: 80vh;
   object-fit: contain;
   display: block;
   animation: bee-float 3.6s ease-in-out infinite;
@@ -58,47 +58,25 @@ body {
 
 .lp-right {
   flex: 1;
-  background: #1a1a1a;
+  background: #ffc200;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
   overflow: hidden;
 }
 
-.lp-watermark {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 36vw;
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.045);
-  user-select: none;
-  pointer-events: none;
-  letter-spacing: -0.06em;
-  line-height: 1;
-}
-
 .lp-card {
-  position: relative;
-  z-index: 1;
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 44px 52px;
-  width: min(360px, calc(100% - 48px));
+  background: #111111;
+  border-radius: 16px;
+  padding: 40px 44px;
+  width: min(360px, calc(100% - 64px));
 }
 
 .lp-title {
-  margin: 0 0 30px;
-  font-size: 2rem;
-  font-weight: 300;
-  letter-spacing: 0.08em;
-  color: #fff;
+  margin: 0 0 28px;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: #ffc200;
 }
 
 .lp-error {
@@ -113,65 +91,78 @@ body {
 
 .lp-field {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
 }
 
 .lp-label {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.55);
-  width: 52px;
-  flex-shrink: 0;
-  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .lp-input {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
-  padding: 10px 14px;
-  color: #fff;
-  font-size: 0.9rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
   outline: none;
   transition: border-color 0.2s;
 }
 
 .lp-input:focus {
-  border-color: rgba(255, 255, 255, 0.42);
+  border-bottom-color: #ffc200;
 }
 
 .lp-input::placeholder {
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.22);
 }
 
 .lp-btn {
-  margin-top: 10px;
+  margin-top: 32px;
   width: 100%;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 14px;
+  background: #ffc200;
+  border: none;
   border-radius: 10px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.9rem;
-  letter-spacing: 0.1em;
-  transition: background 0.2s, border-color 0.2s;
+  color: #111111;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background 0.2s;
 }
 
 .lp-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #ffd040;
 }
 
 .lp-btn:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: #e6ad00;
 }
 
-@media (max-width: 600px) {
+.lp-link {
+  display: block;
+  text-align: center;
+  margin-top: 18px;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.lp-link:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+@media (max-width: 640px) {
   .login-page { flex-direction: column; }
-  .lp-left { width: 100%; height: 38vh; }
-  .lp-watermark { font-size: 55vw; }
+  .lp-left { width: 100%; height: 40vh; }
   .lp-card { padding: 28px 24px; }
 }
 /* ========================= */
