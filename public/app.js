@@ -9,6 +9,7 @@
   reportFilters: defaultFilters(),
   goals: JSON.parse(localStorage.getItem('mktime_goals') || '{"daily":480,"weekly":2400}'),
   chartMode: 'week',
+  taskFilter: 'today',
 };
 
 const COMPANY_CLASS = { Carbone: 'c0', Seubone: 'c1', Onevo: 'c2' };
@@ -308,6 +309,253 @@ function dashboardView() {
   const { user, companies } = appState.session;
   const data = appState.dashboard;
   const activeEntry = data.activeEntry;
+  const errorHtml = appState.error ? `<div class="nd-error">${appState.error}</div>` : '';
+
+  const COLORS = ['c0', 'c1', 'c2'];
+  const colorMap = {};
+  companies.forEach((c, i) => { colorMap[c.id] = COLORS[i % 3]; colorMap[c.name] = COLORS[i % 3]; });
+
+  const dailyGoalMin  = appState.goals.daily;
+  const weeklyGoalMin = appState.goals.weekly;
+  const todayMin = data.recentEntries.filter(e => isToday(e.startAt)).reduce((s, e) => s + minutesDiff(e), 0);
+  const weekMin  = data.userWeekMinutes;
+  const excWeek  = Math.max(0, weekMin - weeklyGoalMin);
+  const remWeek  = Math.max(0, weeklyGoalMin - weekMin);
+  const weekPct  = Math.min(100, weeklyGoalMin > 0 ? Math.round(weekMin / weeklyGoalMin * 100) : 0);
+
+  const activeCompanyName = activeEntry ? (companies.find(c => c.id === activeEntry.companyId)?.name || '') : '';
+
+  const sidebarCompanies = companies.map((c, i) => {
+    const isAct = activeEntry && activeEntry.companyId === c.id;
+    return `
+      <button class="nd-nav-item${isAct ? ' active' : ''}" data-action="start" data-company-id="${c.id}">
+        <span class="nd-nav-item-left">
+          <span class="nd-nav-dot ${COLORS[i % 3]}"></span>
+          <span>${c.name}</span>
+        </span>
+        <span class="nd-nav-chevron">${isAct ? '●' : '›'}</span>
+      </button>`;
+  }).join('');
+
+  const timerHtml = activeEntry ? `
+    <div class="nd-timer-kicker">CRONÔMETRO · TAREFA ATUAL</div>
+    <div class="nd-timer-display live-tick">${fmtLive(activeEntry.startAt)}</div>
+    <div class="nd-timer-info">${activeCompanyName}</div>
+    <div class="nd-timer-actions">
+      <button class="nd-timer-btn stop" data-action="stop">&#9209; Parar</button>
+    </div>` : `
+    <div class="nd-timer-kicker">CRONÔMETRO · TAREFA ATUAL</div>
+    <div class="nd-timer-display idle">--:--:--</div>
+    <div class="nd-timer-info">Selecione uma empresa ao lado para iniciar</div>`;
+
+  const filter = appState.taskFilter;
+  const filteredEntries = data.recentEntries.filter(e => {
+    if (filter === 'today') return isToday(e.startAt);
+    if (filter === 'week')  return sameMonthOrWeek(e.startAt, 'week');
+    return true;
+  });
+
+  const taskRows = filteredEntries.slice(0, 20).map(entry => {
+    const colorCls = colorMap[entry.companyId] || colorMap[entry.companyName] || 'c0';
+    const isActive = !entry.endAt;
+    const isBlocked = activeEntry && !isActive;
+    const dateLabel = new Date(entry.startAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const statusBadge = isActive
+      ? `<span class="nd-badge nd-badge-active">Em andamento</span>`
+      : `<span class="nd-badge nd-badge-done">Conclu\u00edda</span>`;
+    const tempoDisplay = isActive
+      ? `<span class="live-tick nd-time-cell">${fmtLive(entry.startAt)}</span>`
+      : `<span class="nd-time-cell">${fmtDuration(minutesDiff(entry))}</span>`;
+    const actionBtns = isActive
+      ? `<button class="nd-action-btn stop" data-action="stop" title="Parar">&#9209;</button>`
+      : `<button class="nd-action-btn play" data-action="start" data-company-id="${entry.companyId}"${isBlocked ? ' disabled style="opacity:.3;cursor:not-allowed"' : ''} title="Iniciar">&#9654;</button>
+         <button class="nd-action-btn del" data-delete-entry="${entry.id}" title="Excluir">&#10005;</button>`;
+    return `
+      <tr>
+        <td>
+          <div class="nd-task-name">${entry.companyName}</div>
+          <div class="nd-task-sub">${dateLabel} &middot; ${fmtDateTime(entry.startAt)}</div>
+        </td>
+        <td><div class="nd-company-cell"><span class="nd-company-dot ${colorCls}"></span><span>${entry.companyName}</span></div></td>
+        <td>${statusBadge}</td>
+        <td>${tempoDisplay}</td>
+        <td><span style="color:rgba(255,255,255,0.2)">&mdash;</span></td>
+        <td><div class="nd-action-btns">${actionBtns}</div></td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="nd-layout">
+      <aside class="nd-sidebar">
+        <div class="nd-brand">
+          <div class="nd-brand-icon">H</div>
+          <span class="nd-brand-text">Horas</span>
+        </div>
+        <div class="nd-user">
+          <div class="nd-avatar">${user.name.charAt(0).toUpperCase()}</div>
+          <div>
+            <div class="nd-user-name">Bem-vindo, ${user.name}</div>
+            <div class="nd-user-sub">${activeCompanyName || new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}</div>
+          </div>
+        </div>
+        <div class="nd-search-wrap">
+          <div class="nd-search">
+            <span class="nd-search-icon">&#128269;</span>
+            <input type="text" placeholder="Buscar empresa..." readonly />
+          </div>
+        </div>
+        <div class="nd-nav-section">
+          <div class="nd-nav-label">Empresas</div>
+          ${sidebarCompanies}
+        </div>
+        <div class="nd-nav-section">
+          <div class="nd-nav-label">Geral</div>
+          <button class="nd-nav-item" id="export-btn">
+            <span class="nd-nav-item-left"><span class="nd-nav-icon">&#128202;</span><span>Exportar CSV</span></span>
+          </button>
+          ${user.role === 'admin' ? `
+          <button class="nd-nav-item" id="reset-store-btn">
+            <span class="nd-nav-item-left"><span class="nd-nav-icon">&#9881;&#65039;</span><span>Resetar banco</span></span>
+          </button>` : ''}
+        </div>
+        <div class="nd-spacer"></div>
+        <button class="nd-logout" id="logout-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Sair</span>
+        </button>
+      </aside>
+
+      <div class="nd-content">
+        <header class="nd-topbar">
+          <button class="nd-topbar-icon" title="Notifica\u00e7\u00f5es">&#128276;</button>
+        </header>
+
+        <div class="nd-body">
+          ${errorHtml}
+
+          <div class="nd-metrics">
+            <div class="nd-mcard">
+              <div class="nd-mcard-head"><div class="nd-mcard-icon yellow">&#128336;</div><span class="nd-mcard-menu">&bull;&bull;&bull;</span></div>
+              <div class="nd-mcard-value">${fmtDuration(todayMin)}</div>
+              <div class="nd-mcard-label">Horas hoje</div>
+              <div class="nd-mcard-sub"><span class="up">&#9650;</span> Meta: ${fmtDuration(dailyGoalMin)}</div>
+            </div>
+            <div class="nd-mcard">
+              <div class="nd-mcard-head"><div class="nd-mcard-icon cyan">&#128197;</div><span class="nd-mcard-menu">&bull;&bull;&bull;</span></div>
+              <div class="nd-mcard-value">${fmtDuration(weekMin)}</div>
+              <div class="nd-mcard-label">Horas semana</div>
+              <div class="nd-mcard-sub"><span class="warn">${weekPct}%</span>&nbsp;da meta</div>
+            </div>
+            <div class="nd-mcard">
+              <div class="nd-mcard-head"><div class="nd-mcard-icon green">&#9889;</div><span class="nd-mcard-menu">&bull;&bull;&bull;</span></div>
+              <div class="nd-mcard-value">${fmtDuration(dailyGoalMin)} / ${fmtDuration(weeklyGoalMin)}</div>
+              <div class="nd-mcard-label">Meta di\u00e1ria / semanal</div>
+              <div class="nd-mcard-sub"><span class="${weekPct >= 80 ? 'up' : 'over'}">${weekPct >= 80 ? 'No ritmo certo' : 'Abaixo da meta'}</span></div>
+            </div>
+            <div class="nd-mcard">
+              <div class="nd-mcard-head"><div class="nd-mcard-icon ${excWeek > 0 ? 'red' : 'yellow'}">&#9888;&#65039;</div><span class="nd-mcard-menu">&bull;&bull;&bull;</span></div>
+              <div class="nd-mcard-value${excWeek > 0 ? ' amber' : ''}">${excWeek > 0 ? '+' + fmtDuration(excWeek) : fmtDuration(remWeek)}</div>
+              <div class="nd-mcard-label">Horas excedidas (semana)</div>
+              <div class="nd-mcard-sub"><span class="${excWeek > 0 ? 'over' : ''}">${excWeek > 0 ? 'Acima da meta' : 'Restam para a meta'}</span></div>
+            </div>
+          </div>
+
+          <div class="nd-mid">
+            <div class="nd-card">
+              <div class="nd-card-head">
+                <h3>Horas registradas</h3>
+                <div class="nd-tabs">
+                  <button class="nd-tab${appState.chartMode === 'week' ? ' on' : ''}" id="tab-week">Semanal</button>
+                  <button class="nd-tab${appState.chartMode === 'month' ? ' on' : ''}" id="tab-month">Mensal</button>
+                </div>
+              </div>
+              <div class="nd-chart-area"><canvas id="hours-chart"></canvas></div>
+            </div>
+
+            <div class="nd-right-panel">
+              <div class="nd-card">
+                <div class="nd-card-head">
+                  <h3>Cron\u00f4metro</h3>
+                  ${activeEntry ? `<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:nd-pulse 1.4s infinite"></span>` : ''}
+                </div>
+                <div class="nd-timer-body">${timerHtml}</div>
+              </div>
+
+              <div class="nd-card">
+                <div class="nd-card-head"><h3>Metas de horas</h3></div>
+                <div class="nd-goals-body">
+                  <div class="nd-goal-row">
+                    <span class="nd-goal-label">Meta di\u00e1ria</span>
+                    <div class="nd-goal-ctrl">
+                      <button class="nd-goal-btn" id="nd-daily-dec">&minus;</button>
+                      <span class="nd-goal-val" id="nd-daily-val">${(dailyGoalMin / 60).toFixed(0)}</span>
+                      <span class="nd-goal-unit">h/dia</span>
+                      <button class="nd-goal-btn" id="nd-daily-inc">+</button>
+                    </div>
+                  </div>
+                  <div class="nd-goal-row">
+                    <span class="nd-goal-label">Meta semanal</span>
+                    <div class="nd-goal-ctrl">
+                      <button class="nd-goal-btn" id="nd-weekly-dec">&minus;</button>
+                      <span class="nd-goal-val" id="nd-weekly-val">${(weeklyGoalMin / 60).toFixed(0)}</span>
+                      <span class="nd-goal-unit">h/semana</span>
+                      <button class="nd-goal-btn" id="nd-weekly-inc">+</button>
+                    </div>
+                  </div>
+                  <div class="nd-goal-bar">
+                    <div class="nd-goal-bar-info">
+                      <span>${fmtDuration(weekMin)} de ${fmtDuration(weeklyGoalMin)}</span>
+                      <span>${weekPct}%</span>
+                    </div>
+                    <div class="nd-goal-bar-track">
+                      <div class="nd-goal-bar-fill${excWeek > 0 ? ' over' : ''}" style="width:${weekPct}%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="nd-card">
+            <div class="nd-tasks-head">
+              <h3>Registros de horas</h3>
+              <div class="nd-task-tabs">
+                <button class="nd-task-tab${filter === 'today' ? ' on' : ''}" data-task-tab="today">Hoje</button>
+                <button class="nd-task-tab${filter === 'week'  ? ' on' : ''}" data-task-tab="week">Semana</button>
+                <button class="nd-task-tab${filter === 'all'   ? ' on' : ''}" data-task-tab="all">Tudo</button>
+              </div>
+              <button class="nd-export-btn" id="export-btn">&#8595; Exportar CSV</button>
+            </div>
+            ${taskRows
+              ? `<div class="nd-tasks-scroll"><table class="nd-tasks-table">
+                  <thead><tr><th>Empresa / Sess\u00e3o</th><th>Empresa</th><th>Status</th><th>Tempo</th><th>Meta</th><th>A\u00e7\u00f5es</th></tr></thead>
+                  <tbody>${taskRows}</tbody>
+                </table></div>`
+              : `<div class="nd-empty">Nenhum registro encontrado para este per\u00edodo.</div>`}
+          </div>
+
+          ${user.role === 'admin' ? `
+          <div class="nd-card" style="border-color:rgba(239,68,68,.15)">
+            <div class="nd-card-head">
+              <h3>Administra\u00e7\u00e3o</h3>
+              <span class="nd-badge nd-badge-pending">Admin only</span>
+            </div>
+            <div class="nd-admin-body">
+              <p class="nd-admin-desc">Reseta o banco de dados para o estado inicial. <strong>Todos os registros de horas ser\u00e3o apagados.</strong></p>
+              <button class="nd-timer-btn stop" id="reset-store-btn" style="width:auto;padding:9px 20px">Resetar banco de dados</button>
+            </div>
+          </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+  const { user, companies } = appState.session;
+  const data = appState.dashboard;
+  const activeEntry = data.activeEntry;
   const errorHtml = appState.error ? `<div class="db-error">${appState.error}</div>` : '';
 
   const dailyGoalMin  = appState.goals.daily;
@@ -510,8 +758,10 @@ function bindDashboardView() {
 
   document.querySelectorAll('[data-action="start"]').forEach(btn => {
     btn.addEventListener('click', async () => {
+      const companyId = Number(btn.dataset.companyId);
+      if (!companyId) return;
       try {
-        await request('/api/timer/start', { method: 'POST', body: JSON.stringify({ companyId: Number(btn.dataset.companyId) }) });
+        await request('/api/timer/start', { method: 'POST', body: JSON.stringify({ companyId }) });
         await refreshAuthenticatedView(); render();
       } catch (e) { setError(e.message); }
     });
@@ -535,21 +785,21 @@ function bindDashboardView() {
     });
   });
 
-  document.querySelectorAll('[data-company-nav]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const el = document.getElementById(`company-${btn.dataset.companyNav}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-  });
-
-  document.getElementById('save-goals-btn')?.addEventListener('click', () => {
-    const daily  = Math.max(1, Math.min(24,  Number(document.getElementById('goal-daily').value)))  * 60;
-    const weekly = Math.max(1, Math.min(168, Number(document.getElementById('goal-weekly').value))) * 60;
-    appState.goals = { daily, weekly };
+  // Goals ± buttons
+  function updateGoal(key, delta, valId, min, max) {
+    const current = Math.round(appState.goals[key] / 60);
+    const next = Math.max(min, Math.min(max, current + delta));
+    appState.goals[key] = next * 60;
     localStorage.setItem('mktime_goals', JSON.stringify(appState.goals));
-    render();
-  });
+    const el = document.getElementById(valId);
+    if (el) el.textContent = next;
+  }
+  document.getElementById('nd-daily-dec')?.addEventListener('click',  () => updateGoal('daily',  -1, 'nd-daily-val',  1, 24));
+  document.getElementById('nd-daily-inc')?.addEventListener('click',  () => updateGoal('daily',  +1, 'nd-daily-val',  1, 24));
+  document.getElementById('nd-weekly-dec')?.addEventListener('click', () => updateGoal('weekly', -1, 'nd-weekly-val', 1, 168));
+  document.getElementById('nd-weekly-inc')?.addEventListener('click', () => updateGoal('weekly', +1, 'nd-weekly-val', 1, 168));
 
+  // Chart tabs
   document.getElementById('tab-week')?.addEventListener('click', () => {
     appState.chartMode = 'week'; initHoursChart();
     document.getElementById('tab-week')?.classList.add('on');
@@ -561,18 +811,26 @@ function bindDashboardView() {
     document.getElementById('tab-week')?.classList.remove('on');
   });
 
+  // Task filter tabs
+  document.querySelectorAll('[data-task-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      appState.taskFilter = btn.dataset.taskTab;
+      render();
+    });
+  });
+
   document.getElementById('export-btn')?.addEventListener('click', () => {
     window.open('/api/reports/export', '_blank');
   });
 
   document.getElementById('reset-store-btn')?.addEventListener('click', async () => {
-    if (!confirm('Tem certeza? Isso apagara TODOS os registros de horas e redefinira os usuarios.')) return;
+    if (!confirm('Tem certeza? Isso apagar\u00e1 TODOS os registros de horas e redefinir\u00e1 os usu\u00e1rios.')) return;
     try {
       await request('/api/reset', { method: 'POST' });
       await request('/api/logout', { method: 'POST' });
       appState.session = { authenticated: false }; appState.dashboard = null;
       appState.reports = null; appState.error = '';
-      appState.info = '\u2713 Banco de dados resetado. Faca login com os novos usuarios.';
+      appState.info = '\u2713 Banco de dados resetado. Fa\u00e7a login com os novos usu\u00e1rios.';
       render();
     } catch (e) { setError(e.message); }
   });
