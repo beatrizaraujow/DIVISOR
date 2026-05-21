@@ -580,7 +580,7 @@ function bindDashboardView() {
       const companyId = Number(btn.dataset.companyId);
       if (!companyId) return;
       try {
-        await request('/api/timer/start', { method: 'POST', body: JSON.stringify({ companyId }) });
+        await request('/api/timer-start', { method: 'POST', body: JSON.stringify({ companyId }) });
         await refreshAuthenticatedView(); render();
       } catch (e) { setError(e.message); }
     });
@@ -589,7 +589,7 @@ function bindDashboardView() {
   document.querySelectorAll('[data-action="stop"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
-        await request('/api/timer/stop', { method: 'POST' });
+        await request('/api/timer-stop', { method: 'POST' });
         await refreshAuthenticatedView(); render();
       } catch (e) { setError(e.message); }
     });
@@ -598,7 +598,7 @@ function bindDashboardView() {
   document.querySelectorAll('[data-delete-entry]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
-        await request(`/api/entries/${btn.dataset.deleteEntry}`, { method: 'DELETE' });
+        await request(`/api/entry?id=${btn.dataset.deleteEntry}`, { method: 'DELETE' });
         await refreshAuthenticatedView(); render();
       } catch (e) { setError(e.message); }
     });
@@ -639,7 +639,7 @@ function bindDashboardView() {
   });
 
   document.getElementById('export-btn')?.addEventListener('click', () => {
-    window.open('/api/reports/export', '_blank');
+    window.open('/api/reports-export', '_blank');
   });
 
   document.getElementById('reset-store-btn')?.addEventListener('click', async () => {

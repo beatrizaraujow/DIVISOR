@@ -65,20 +65,20 @@ async function dispatch(req) {
     if (method === 'GET' && route === '/dashboard') {
       return requireAuth(req, stateMeta.state, user => handleDashboard(stateMeta.state, user));
     }
-    if (method === 'POST' && route === '/timer/start') {
+    if (method === 'POST' && route === '/timer-start') {
       return await requireAuth(req, stateMeta.state, user => handleTimerStart(req, user));
     }
-    if (method === 'POST' && route === '/timer/stop') {
+    if (method === 'POST' && route === '/timer-stop') {
       return await requireAuth(req, stateMeta.state, user => handleTimerStop(user));
     }
     if (method === 'GET' && route === '/reports') {
       return requireAuth(req, stateMeta.state, user => handleReports(req, stateMeta.state, user));
     }
-    if (method === 'GET' && route === '/reports/export') {
+    if (method === 'GET' && route === '/reports-export') {
       return requireAuth(req, stateMeta.state, user => handleReportExport(req, stateMeta.state, user));
     }
-    if (method === 'DELETE' && route.startsWith('/entries/')) {
-      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(route, stateMeta.state, user));
+    if (method === 'DELETE' && route === '/entry') {
+      return await requireAuth(req, stateMeta.state, user => handleDeleteEntry(url, stateMeta.state, user));
     }
     if (method === 'POST' && route === '/password') {
       return await handleChangePassword(req, stateMeta.state);
@@ -86,7 +86,7 @@ async function dispatch(req) {
     if (method === 'POST' && route === '/reset') {
       return await requireAuth(req, stateMeta.state, user => handleReset(user));
     }
-    if (method === 'GET' && route === '/admin/reset') {
+    if (method === 'GET' && route === '/admin-reset') {
       return await handlePublicReset(req);
     }
 
@@ -453,8 +453,8 @@ function handleReportExport(req, state) {
   });
 }
 
-async function handleDeleteEntry(route, state, user) {
-  const entryId = Number(route.split('/').pop());
+async function handleDeleteEntry(url, state, user) {
+  const entryId = Number(url.searchParams.get('id'));
   const existing = state.entries.find(e => e.id === entryId);
 
   if (!existing) return json(404, { error: 'Registro nao encontrado.' });
