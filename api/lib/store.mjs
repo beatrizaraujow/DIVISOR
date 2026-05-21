@@ -59,8 +59,15 @@ function createInitialState() {
   };
 }
 
+// In-memory fallback for Vercel without Redis (not persistent across cold starts)
+const memoryStore = { state: null };
+
 function isVercelRuntime() {
   return !!process.env.UPSTASH_REDIS_REST_URL;
+}
+
+function isVercelWithoutRedis() {
+  return !!process.env.VERCEL && !process.env.UPSTASH_REDIS_REST_URL;
 }
 
 function clone(value) {
@@ -92,6 +99,11 @@ function applyMigrations(state) {
 }
 
 async function readStateWithMeta() {
+  if (isVercelWithoutRedis()) {
+    if (!memoryStore.state) memoryStore.state = createInitialState();
+    return { state: clone(memoryStore.state), etag: null };
+  }
+
   if (isVercelRuntime()) {
     const redis = getRedis();
     let state = await redis.get(STORE_KEY);
@@ -135,6 +147,11 @@ async function readStateWithMeta() {
 }
 
 async function writeState(nextState, expectedEtag) {
+  if (isVercelWithoutRedis()) {
+    memoryStore.state = clone(nextState);
+    return null;
+  }
+
   if (isVercelRuntime()) {
     const redis = getRedis();
     await redis.set(STORE_KEY, JSON.stringify(nextState));
@@ -178,7 +195,9 @@ async function updateState(mutator, retries = 4) {
 
 async function resetToSeed() {
   const freshState = createInitialState();
-  if (isVercelRuntime()) {
+  if (isVercelWithoutRedis()) {
+    memoryStore.state = freshState;
+  } else if (isVercelRuntime()) {
     const redis = getRedis();
     await redis.set(STORE_KEY, JSON.stringify(freshState));
   } else {
