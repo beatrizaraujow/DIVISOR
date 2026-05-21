@@ -101,6 +101,43 @@ function render() {
 /* ============ LOGIN ============ */
 function loginView() {
   const errorHtml = appState.error ? `<div class="lp-error">${appState.error}</div>` : '';
+  const infoHtml  = appState.info  ? `<div class="lp-info">${appState.info}</div>`   : '';
+
+  if (appState.loginMode === 'change-password') {
+    return `
+    <main class="login-page">
+      <div class="lp-left">
+        <img src="/logo/logo.png" alt="logo" class="lp-logo" />
+      </div>
+      <div class="lp-right">
+        <div class="lp-card">
+          <h2 class="lp-title">Alterar Senha</h2>
+          ${errorHtml}
+          <form id="change-password-form">
+            <div class="lp-field">
+              <label class="lp-label" for="cp-login">NOME</label>
+              <input class="lp-input" id="cp-login" name="login" autocomplete="username" placeholder="seu nome" required />
+            </div>
+            <div class="lp-field">
+              <label class="lp-label" for="cp-current">SENHA ATUAL</label>
+              <input class="lp-input" id="cp-current" name="currentPassword" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            </div>
+            <div class="lp-field">
+              <label class="lp-label" for="cp-new">NOVA SENHA</label>
+              <input class="lp-input" id="cp-new" name="newPassword" type="password" autocomplete="new-password" placeholder="••••••••" required />
+            </div>
+            <div class="lp-field">
+              <label class="lp-label" for="cp-confirm">CONFIRMAR NOVA SENHA</label>
+              <input class="lp-input" id="cp-confirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="••••••••" required />
+            </div>
+            <button class="lp-btn" type="submit">ALTERAR SENHA</button>
+          </form>
+          <span class="lp-link" id="back-to-login">← Voltar ao login</span>
+        </div>
+      </div>
+    </main>`;
+  }
+
   return `
     <main class="login-page">
       <div class="lp-left">
@@ -110,6 +147,7 @@ function loginView() {
         <div class="lp-card">
           <h2 class="lp-title">Entrar</h2>
           ${errorHtml}
+          ${infoHtml}
           <form id="login-form">
             <div class="lp-field">
               <label class="lp-label" for="login">NOME</label>
@@ -121,7 +159,7 @@ function loginView() {
             </div>
             <button class="lp-btn" type="submit">ACESSAR</button>
           </form>
-          <span class="lp-link">Alterar senha</span>
+          <span class="lp-link" id="show-change-password">Alterar senha</span>
         </div>
       </div>
     </main>`;
